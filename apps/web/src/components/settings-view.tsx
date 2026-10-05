@@ -59,7 +59,14 @@ interface SettingsEntry {
 }
 
 const settingsEntries: SettingsEntry[] = [
-  { id: "updates", group: "About", title: "Updates", description: "Client and server versions", keywords: "stable nightly release version update", icon: Download },
+  {
+    id: "updates",
+    group: "About",
+    title: "Updates",
+    description: "Client and server versions",
+    keywords: "stable nightly release version update",
+    icon: Download,
+  },
   {
     id: "profile",
     group: "Account",
@@ -286,7 +293,14 @@ export function SettingsView({
                 onPreferences={setPreferences}
               />
             )}
-            {page === "updates" && <button className="border border-white px-3 py-2 text-white" onClick={() => onNavigate("updates")}>Open updates</button>}
+            {page === "updates" && (
+              <button
+                className="border border-white px-3 py-2 text-white"
+                onClick={() => onNavigate("updates")}
+              >
+                Open updates
+              </button>
+            )}
             {page === "about" && <AboutSettings />}
             {page === "advanced" && (
               <AdvancedSettings preferences={preferences} update={update} profile={profile} />
@@ -708,12 +722,26 @@ function PlaybackSettings({ preferences, update }: PreferencePageProps) {
         <Divider />
         <SettingRow
           icon={Film}
-          title="Preferred subtitle language"
-          description="Automatically select matching subtitles"
+          title="Primary subtitle language"
+          description="Automatically select this language first"
         >
           <LanguageSelect
             value={preferences.subtitleLanguage}
+            label="Primary subtitle language"
             onChange={(value) => update("subtitleLanguage", value)}
+          />
+        </SettingRow>
+        <Divider />
+        <SettingRow
+          icon={Film}
+          title="Secondary subtitle language"
+          description="Used when the primary language is unavailable"
+        >
+          <LanguageSelect
+            value={preferences.secondarySubtitleLanguage ?? ""}
+            label="Secondary subtitle language"
+            allowNone
+            onChange={(value) => update("secondarySubtitleLanguage", value || null)}
           />
         </SettingRow>
         <Divider />
@@ -1338,14 +1366,17 @@ function Select({
   value,
   options,
   onChange,
+  label,
 }: {
   value: string
+  label?: string
   options: string[][]
   onChange: (value: string) => void
 }) {
   return (
     <select
       className="h-10 min-w-44 rounded-xl border border-zinc-700 bg-zinc-950 px-3 text-sm text-zinc-200 outline-none focus:border-amber-400"
+      aria-label={label}
       value={value}
       onChange={(event) => onChange(event.target.value)}
     >
@@ -1357,12 +1388,24 @@ function Select({
     </select>
   )
 }
-function LanguageSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function LanguageSelect({
+  value,
+  onChange,
+  allowNone = false,
+  label,
+}: {
+  value: string
+  onChange: (value: string) => void
+  allowNone?: boolean
+  label?: string
+}) {
   return (
     <Select
       value={value}
+      label={label}
       onChange={onChange}
       options={[
+        ...(allowNone ? [["", "None"]] : []),
         ["auto", "System default"],
         ["en", "English"],
         ["es", "Spanish"],
@@ -1505,6 +1548,11 @@ function importedPreferences(
   const next = { ...current }
   for (const key of ["audioLanguage", "subtitleLanguage"] as const)
     if (typeof value[key] === "string") next[key] = value[key]
+  if (
+    value.secondarySubtitleLanguage === null ||
+    typeof value.secondarySubtitleLanguage === "string"
+  )
+    next.secondarySubtitleLanguage = value.secondarySubtitleLanguage || null
   for (const [key, min, max] of [
     ["subtitleSize", 75, 200],
     ["subtitlePosition", 10, 100],

@@ -96,6 +96,7 @@ actual fun NativePlayer(
     startPositionMs: Long,
     requestHeaders: Map<String, String>,
     subtitles: List<SubtitleItem>,
+    subtitlesResolved: Boolean,
     contentLogo: String?,
     contentTitle: String?,
     contentSubtitle: String?,
@@ -108,6 +109,7 @@ actual fun NativePlayer(
     holdToSpeed: Boolean,
     preferredAudioLanguage: String,
     preferredSubtitleLanguage: String,
+    secondarySubtitleLanguage: String?,
     subtitleStyle: SubtitleStyle,
     onSubtitleStyleChanged: (SubtitleStyle) -> Unit,
     androidPlaybackEngine: AndroidPlaybackEngine,
@@ -199,7 +201,7 @@ actual fun NativePlayer(
             // Set preferences before mpv opens the asset so its initial
             // stream choice matches the app settings, not the first stream.
             bridge.setPreferredAudioLanguage(preferredAudioLanguage)
-            bridge.setPreferredSubtitleLanguage(preferredSubtitleLanguage)
+            bridge.setSubtitlePreferences(preferredSubtitleLanguage, secondarySubtitleLanguage, subtitlesResolved)
             bridge.loadFile(
                 url = it,
                 loadId = loadId,
@@ -213,8 +215,9 @@ actual fun NativePlayer(
         }
     }
 
-    LaunchedEffect(bridge, encodedSubtitles) {
-        if (encodedSubtitles != "[]") bridge.updateExternalSubtitles(encodedSubtitles)
+    LaunchedEffect(bridge, encodedSubtitles, preferredSubtitleLanguage, secondarySubtitleLanguage, subtitlesResolved) {
+        bridge.updateExternalSubtitles(encodedSubtitles)
+        bridge.setSubtitlePreferences(preferredSubtitleLanguage, secondarySubtitleLanguage, subtitlesResolved)
     }
 
     LaunchedEffect(bridge, active) {
@@ -259,10 +262,6 @@ actual fun NativePlayer(
 
     LaunchedEffect(bridge, preferredAudioLanguage) {
         bridge.setPreferredAudioLanguage(preferredAudioLanguage)
-    }
-
-    LaunchedEffect(bridge, preferredSubtitleLanguage) {
-        bridge.setPreferredSubtitleLanguage(preferredSubtitleLanguage)
     }
 
     LaunchedEffect(bridge, subtitleStyle) {

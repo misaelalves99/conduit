@@ -1687,6 +1687,7 @@ internal fun MediaDetailsScreen(
                 .mapNotNull { (key, value) -> value.jsonPrimitive.contentOrNull?.let { key to it } }
                 .toMap(),
             subtitles = externalSubtitles,
+            subtitlesResolved = externalSubtitlesLoaded,
             title = playerContentTitle,
             mediaName = if (selectedVideo != null) {
                 "${meta?.name ?: item.name}  ·  ${selectedVideo?.displayTitle}"
@@ -1721,8 +1722,7 @@ internal fun MediaDetailsScreen(
         openingPlayback = false
     }
     LaunchedEffect(requestIdentity, externalSubtitlesLoaded, externalSubtitles) {
-        if (!externalSubtitlesLoaded || externalSubtitles.isEmpty()) return@LaunchedEffect
-        requestIdentity?.let { playbackSession.updateSubtitles(it, externalSubtitles) }
+        requestIdentity?.let { playbackSession.updateSubtitles(it, externalSubtitles, externalSubtitlesLoaded) }
     }
     SideEffect {
         if (requestIdentity != null && sessionCallbacks != null) {
@@ -3755,7 +3755,9 @@ internal fun PlaybackSettingsScreen(platform: PlatformInfo, preferences: DeviceP
         }
         SettingsGroup("AUDIO & SUBTITLES") {
             SettingsAction("Preferred audio language", preferences.preferredAudioLanguage) { picker = "audio" }
-            HorizontalDivider(color = Color.White.copy(.06f)); SettingsAction("Preferred subtitle language", preferences.preferredSubtitleLanguage) { picker = "subtitle" }
+            HorizontalDivider(color = Color.White.copy(.06f)); SettingsAction("Primary subtitle language", preferences.preferredSubtitleLanguage) { picker = "subtitle" }
+            HorizontalDivider(color = Color.White.copy(.06f))
+            SettingsAction("Secondary subtitle language", preferences.secondarySubtitleLanguage ?: "None") { picker = "secondary-subtitle" }
             HorizontalDivider(color = Color.White.copy(.06f))
             SubtitleStyleControls(
                 style = preferences.subtitleStyle,
@@ -3801,7 +3803,44 @@ internal fun PlaybackSettingsScreen(platform: PlatformInfo, preferences: DeviceP
         },
         confirmButton = {},
     )
-    if (picker != null) AlertDialog(onDismissRequest = { picker = null }, title = { Text(if (picker == "audio") "Preferred audio language" else "Preferred subtitle language") }, text = { Column { languages.forEach { language -> Row(Modifier.fillMaxWidth().clickable { if (picker == "audio") update(preferences.copy(preferredAudioLanguage = language)) else update(preferences.copy(preferredSubtitleLanguage = language)); picker = null }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) { RadioButton((if (picker == "audio") preferences.preferredAudioLanguage else preferences.preferredSubtitleLanguage) == language, null); Spacer(Modifier.width(8.dp)); Text(language) } } } }, confirmButton = {})
+    picker?.let { activePicker ->
+        val title = when (activePicker) {
+            "audio" -> "Preferred audio language"
+            "subtitle" -> "Primary subtitle language"
+            else -> "Secondary subtitle language"
+        }
+        val selected = when (activePicker) {
+            "audio" -> preferences.preferredAudioLanguage
+            "subtitle" -> preferences.preferredSubtitleLanguage
+            else -> preferences.secondarySubtitleLanguage ?: "None"
+        }
+        AlertDialog(
+            onDismissRequest = { picker = null },
+            title = { Text(title) },
+            text = {
+                Column {
+                    (if (activePicker == "secondary-subtitle") listOf("None") + languages else languages).forEach { language ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                update(when (activePicker) {
+                                    "audio" -> preferences.copy(preferredAudioLanguage = language)
+                                    "subtitle" -> preferences.copy(preferredSubtitleLanguage = language)
+                                    else -> preferences.copy(secondarySubtitleLanguage = language.takeUnless { it == "None" })
+                                })
+                                picker = null
+                            }.padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(selected == language, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(language)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+        )
+    }
     if (enginePicker) AlertDialog(
         onDismissRequest = { enginePicker = false },
         title = { Text("Android player engine") },
